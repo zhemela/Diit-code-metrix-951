@@ -17,6 +17,8 @@
         <script src="~/lib/arbor/js/arbor-graphics.js"></script>
         <script src="~/lib/arbor/js/arbor-tween.js"></script>
         <script src="~/lib/sigma.js/plugins/sigma.layout.forceAtlas2.min.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/jstree.min.js"></script>
 
     </head>
     <body>
@@ -41,8 +43,10 @@
                             <div id="editor"></div>
                         </div>
                         <div id="tab02" class="tab-contents">
-                            <form><input id="filereader" type="file" name="files" multiple /></form>
+                            <form><input id="filereader" webkitdirectory directory type="file" name="files" multiple /></form>
+                            <div id="jstree_demo_div"></div>
                         </div>
+                      
                     </div>
                 </div>
                 <div class="col-sm-6">
@@ -58,9 +62,77 @@
                 </div>
             </div>
         </div>
+     
         <script>
             $(function () {
+                let files;
 
+                $('#filereader').on('change', function (e) {
+                    const data = []
+                    files = e.target.files;
+                    const rootFolderName = files[0].webkitRelativePath.split('/')[0]
+                    data.push({ id: rootFolderName, parent: '#', text: rootFolderName })
+                    for (file of files) {
+                        const paths = file.webkitRelativePath.split('/')
+                        if (paths.length) {
+                            for (let i = 1; i < paths.length; i++) {
+                                if (paths[i] && !data.find((element) => element.id === paths[i])) {
+                                    data.push({ id: paths[i], parent: paths[i - 1], text: paths[i] })
+                                }
+                            }
+                            console.log(data)
+                            setTimeout(() => {
+                                $('#jstree_demo_div').jstree({
+                                    "core": {
+                                        "check_callback": true,
+                                        'data': data
+                                    },
+                                    "plugins": ["dnd"]
+                                });
+                            }, 5000)
+                            
+                        }
+                    }
+                })
+
+                console.log($('#jstree_demo_div'))
+                $('#jstree_demo_div').on("changed.jstree", function (e, data) {
+                    let fileToSend;
+                    for (let file of files) {
+                        if (file.name === data.selected[0]) {
+                            fileToSend = file
+                            break
+                        }
+                    }
+
+                    request_data = new FormData();
+                    
+                        request_data.append('Files', fileToSend);
+                    window.a = request_data;
+                    request_data.append("FileType", "cs");
+                  
+                    $.ajax({
+                        url: '/Analyze/LoadFileAndAnalyze',
+                        type: "POST",
+                        data: request_data,
+                        contentType: false,
+                        processData: false,
+                        success: function (response) {
+                            metrics = response.metrics
+                            let info = `Цикломатическое цисло:${metrics.ComplexityNumber}\n` + JSON.stringify(metrics.HMetrics).replace(/("|{|}|")/gi, '').replace(/(,)/gi, '\n');
+                            $("#consolearea").text(info)
+                            $("#graph-select").empty()
+                            for (let name of Object.keys(metrics.GraphEntities))
+                                $("#graph-select").append(`<a class="dropdown-item" href="#">${name}</a>`)
+                        },
+                        error: err => console.log(err)
+                    });
+                });
+                $('#button').on('click', function () {
+                    $('#jstree').jstree(true).select_node('child_node_1');
+                    $('#jstree').jstree('select_node', 'child_node_1');
+                    $.jstree.reference('#jstree').select_node('child_node_1');
+                });
                 var Renderer = function (canvas) {
                     var canvas = $(canvas).get(0);
                     var ctx = canvas.getContext("2d");
@@ -92,7 +164,7 @@
 
                             particleSystem.eachNode( //теперь каждую вершину
                                 function (node, pt) {  //получаем вершину и точку где она
-                                    
+
                                     var w = 10;   //ширина квадрата
                                     ctx.fillStyle = node.data.color; //с его цветом понятно
                                     ctx.fillRect(pt.x - w / 2, pt.y - w / 2, w, w); //рисуем
@@ -232,22 +304,22 @@
 
                         var colorNode = '';
                         var labelNode = '';
-                    
+
                         switch (item.Type) {
-                            case "Empty": colorNode = '#666'; labelNode = ''; 
+                            case "Empty": colorNode = '#666'; labelNode = '';
                                 break;
                             case "If": colorNode = '#0F0'; labelNode = ''; break;
                             case "Else": colorNode = '#0F0'; labelNode = ''; break;
-                            case "Cycle": colorNode = '#FFC107'; labelNode = item.Comment; 
+                            case "Cycle": colorNode = '#FFC107'; labelNode = item.Comment;
                                 break;
                             case "StartProcedure": colorNode = '#F00'; labelNode = item.Comment;
                                 break;
-                            case "EndProcedure": colorNode = '#000'; labelNode = 'return'; 
+                            case "EndProcedure": colorNode = '#000'; labelNode = 'return';
                                 break;
                         }
 
-                        
-                    
+
+
 
                         let curNode = {
                             //p: item.Number,
@@ -258,15 +330,15 @@
                         }
 
                         console.log(curNode)
-                   
+
                         for (let con of item.ConnectedTo)
                             g.edges.push({
                                 //id: `n${item.Number}n${con}`,
-                                src: 'n' + item.Number ,
-                                dest: 'n' +  con 
+                                src: 'n' + item.Number,
+                                dest: 'n' + con
                                 //color: '#ccc'
                             })
-                    
+
 
                         g.nodes.push(curNode)
 
